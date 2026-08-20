@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchHotelById } from '../services/hotelService'
 import { fetchChambresByHotelId } from '../services/chambreService'
@@ -24,8 +24,12 @@ const notFound = ref(false)
 const note = ref<number | null>(null)
 const activePhoto = ref(0)
 
-const fallbackImage =
-  'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg?auto=compress&cs=tinysrgb&w=1600'
+const prixMini = computed<number | null>(() => {
+  const tarifs = chambres.value
+    .map((c) => c.tarif_nuit)
+    .filter((t): t is number => typeof t === 'number')
+  return tarifs.length ? Math.min(...tarifs) : null
+})
 
 async function loadDetail() {
   loading.value = true
@@ -34,7 +38,7 @@ async function loadDetail() {
   try {
     const idNum = Number(props.id)
     if (!Number.isFinite(idNum)) {
-      error.value = `ID invalide : ${props.id}`
+      error.value = `Identifiant invalide : ${props.id}`
       loading.value = false
       return
     }
@@ -60,8 +64,10 @@ async function loadDetail() {
     activePhoto.value = 0
   } catch (e: any) {
     console.error('[HotelDetail] loadDetail error', e)
-    // Affiche le message d'erreur retourné par Supabase si disponible
-    error.value = e?.message || (typeof e === 'object' ? JSON.stringify(e) : String(e)) || "Impossible de charger les détails de cet hôtel."
+    error.value =
+      e?.message ||
+      (typeof e === 'object' ? JSON.stringify(e) : String(e)) ||
+      "Impossible de charger les détails de cet hôtel."
   } finally {
     loading.value = false
   }
@@ -73,6 +79,11 @@ onMounted(loadDetail)
 function formatPrix(p: number | null): string {
   if (p === null || p === undefined) return 'Non disponible'
   return `${p.toLocaleString('fr-FR')} € / nuit`
+}
+
+function formatDate(d: string | null): string {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 </script>
 
@@ -90,6 +101,9 @@ function formatPrix(p: number | null): string {
     <!-- Erreur -->
     <div v-else-if="error" class="mx-auto max-w-3xl px-6 py-24 text-center">
       <p class="rounded-2xl bg-coral-50 p-8 text-coral-700">{{ error }}</p>
+      <button class="btn-primary mt-6" @click="router.push('/hotels')">
+        Retour à la liste
+      </button>
     </div>
 
     <!-- Introuvable -->
@@ -107,19 +121,35 @@ function formatPrix(p: number | null): string {
       <section class="mx-auto max-w-7xl px-6">
         <div class="relative overflow-hidden rounded-3xl">
           <img
-            :src="photos[activePhoto]?.url || fallbackImage"
+            v-if="photos.length"
+            :src="photos[activePhoto]?.url || ''"
             :alt="photos[activePhoto]?.legende || hotel.nom"
-            class="h-[60vh] w-full object-cover"
+            class="h-[55vh] w-full object-cover md:h-[60vh]"
           />
-          <div class="absolute inset-0 bg-gradient-to-t from-lagoon-900/70 via-transparent to-transparent" />
+          <!-- État neutre quand aucune photo Supabase -->
+          <div
+            v-else
+            class="flex h-[55vh] w-full items-center justify-center bg-gradient-to-br from-lagoon-100 to-lagoon-200 md:h-[60vh]"
+            aria-hidden="true"
+          >
+            <svg class="h-20 w-20 text-lagoon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l1.5-2h3L9 7m0 0l-6 .01M9 7h11a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V8m6-1l1.5-2h3L16 7m-7 0h7" />
+            </svg>
+          </div>
+          <div class="absolute inset-0 bg-gradient-to-t from-lagoon-900/75 via-transparent to-transparent" />
           <div class="absolute bottom-0 left-0 right-0 p-8 text-white">
             <p class="mb-2 text-sm uppercase tracking-widest text-sand-100/80">{{ hotel.commune }}</p>
             <h1 class="font-serif text-4xl font-semibold md:text-5xl">{{ hotel.nom }}</h1>
-            <div v-if="note" class="mt-3 flex items-center gap-2">
-              <span class="rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-lagoon-700">
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <span v-if="note" class="rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-lagoon-700">
                 ★ {{ note.toFixed(1) }}
               </span>
-              <span class="text-sm text-sand-100/80">({{ avis.length }} avis)</span>
+              <span v-if="avis.length" class="text-sm text-sand-100/80">
+                {{ avis.length }} avis
+              </span>
+              <span v-if="prixMini" class="rounded-full bg-coral-400 px-3 py-1 text-sm font-semibold text-white">
+                dès {{ prixMini.toLocaleString('fr-FR') }} € / nuit
+              </span>
             </div>
           </div>
         </div>
@@ -129,8 +159,9 @@ function formatPrix(p: number | null): string {
           <button
             v-for="(photo, i) in photos"
             :key="photo.id"
-            class="h-20 w-28 flex-shrink-0 overflow-hidden rounded-lg transition"
+            class="h-20 w-28 flex-shrink-0 overflow-hidden rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-300"
             :class="i === activePhoto ? 'ring-2 ring-coral-400' : 'opacity-60 hover:opacity-100'"
+            :aria-label="`Voir la photo ${i + 1}`"
             @click="activePhoto = i"
           >
             <img :src="photo.url || ''" :alt="photo.legende || ''" class="h-full w-full object-cover" />
@@ -140,7 +171,7 @@ function formatPrix(p: number | null): string {
 
       <!-- Contenu -->
       <section class="mx-auto mt-12 grid max-w-7xl gap-12 px-6 lg:grid-cols-3">
-        <div class="lg:col-span-2 space-y-12">
+        <div class="space-y-14 lg:col-span-2">
           <!-- Description -->
           <div>
             <h2 class="font-serif text-2xl font-semibold text-lagoon-800">À propos</h2>
@@ -164,7 +195,7 @@ function formatPrix(p: number | null): string {
           <!-- Chambres -->
           <div>
             <h2 class="font-serif text-2xl font-semibold text-lagoon-800">Chambres</h2>
-            <div v-if="chambres.length" class="mt-4 grid gap-4 sm:grid-cols-2">
+            <div v-if="chambres.length" class="mt-4 grid gap-5 sm:grid-cols-2">
               <div
                 v-for="ch in chambres"
                 :key="ch.id"
@@ -176,10 +207,10 @@ function formatPrix(p: number | null): string {
                 </p>
                 <div class="mt-4 flex items-center justify-between text-sm">
                   <span v-if="ch.capacite" class="text-lagoon-500">
-                    {{ ch.capacite }} personne(s)
+                    {{ ch.capacite }} personne{{ (ch.capacite || 0) > 1 ? 's' : '' }}
                   </span>
-                  <span :class="ch.prix_par_nuit ? 'font-semibold text-coral-500' : 'text-lagoon-400'">
-                    {{ formatPrix(ch.prix_par_nuit) }}
+                  <span :class="ch.tarif_nuit ? 'font-semibold text-coral-500' : 'text-lagoon-400'">
+                    {{ formatPrix(ch.tarif_nuit) }}
                   </span>
                 </div>
               </div>
@@ -191,7 +222,7 @@ function formatPrix(p: number | null): string {
           <div>
             <h2 class="font-serif text-2xl font-semibold text-lagoon-800">Avis des visiteurs</h2>
             <div v-if="avis.length" class="mt-4 space-y-4">
-              <div
+              <figure
                 v-for="a in avis"
                 :key="a.id"
                 class="rounded-2xl bg-white p-6 shadow-card"
@@ -204,43 +235,51 @@ function formatPrix(p: number | null): string {
                     ★ {{ a.note }}/5
                   </span>
                 </div>
-                <p v-if="a.commentaire" class="mt-3 leading-relaxed text-lagoon-700">
-                  {{ a.commentaire }}
-                </p>
+                <blockquote v-if="a.commentaire" class="mt-3 leading-relaxed text-lagoon-700">
+                  "{{ a.commentaire }}"
+                </blockquote>
                 <p v-if="a.date_creation" class="mt-3 text-xs text-lagoon-400">
-                  {{ new Date(a.date_creation).toLocaleDateString('fr-FR') }}
+                  {{ formatDate(a.date_creation) }}
                 </p>
-              </div>
+              </figure>
             </div>
             <p v-else class="mt-4 italic text-lagoon-400">Aucun avis pour le moment.</p>
           </div>
         </div>
 
-        <!-- Sidebar : informations pratiques -->
-        <aside class="space-y-6">
-          <div class="rounded-2xl bg-white p-6 shadow-card">
-            <h3 class="font-serif text-lg font-semibold text-lagoon-800">Informations pratiques</h3>
-            <dl class="mt-4 space-y-3 text-sm">
-              <div>
-                <dt class="font-medium text-lagoon-500">Commune</dt>
-                <dd class="text-lagoon-800">{{ hotel.commune }}</dd>
-              </div>
-              <div v-if="hotel.adresse">
-                <dt class="font-medium text-lagoon-500">Adresse</dt>
-                <dd class="text-lagoon-800">{{ hotel.adresse }}</dd>
-              </div>
-              <div v-if="hotel.latitude && hotel.longitude">
-                <dt class="font-medium text-lagoon-500">Coordonnées</dt>
-                <dd class="text-lagoon-800">
-                  {{ hotel.latitude }}, {{ hotel.longitude }}
-                </dd>
-              </div>
-            </dl>
-          </div>
+        <!-- Sidebar : informations pratiques (collante) -->
+        <aside class="lg:col-span-1">
+          <div class="sticky top-24 space-y-6">
+            <div class="rounded-2xl bg-white p-6 shadow-card">
+              <h3 class="font-serif text-lg font-semibold text-lagoon-800">Informations pratiques</h3>
+              <dl class="mt-5 space-y-4 text-sm">
+                <div>
+                  <dt class="font-medium text-lagoon-500">Commune</dt>
+                  <dd class="mt-1 text-lagoon-800">{{ hotel.commune }}</dd>
+                </div>
+                <div v-if="hotel.adresse">
+                  <dt class="font-medium text-lagoon-500">Adresse</dt>
+                  <dd class="mt-1 text-lagoon-800">{{ hotel.adresse }}</dd>
+                </div>
+                <div v-if="hotel.latitude && hotel.longitude">
+                  <dt class="font-medium text-lagoon-500">Coordonnées</dt>
+                  <dd class="mt-1 text-lagoon-800">
+                    {{ hotel.latitude }}, {{ hotel.longitude }}
+                  </dd>
+                </div>
+                <div v-if="prixMini">
+                  <dt class="font-medium text-lagoon-500">Tarif à partir de</dt>
+                  <dd class="mt-1 font-semibold text-coral-500">
+                    {{ prixMini.toLocaleString('fr-FR') }} € / nuit
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
-          <button class="btn-primary w-full" @click="router.push('/hotels')">
-            Retour aux hôtels
-          </button>
+            <button class="btn-primary w-full" @click="router.push('/hotels')">
+              Retour aux hôtels
+            </button>
+          </div>
         </aside>
       </section>
     </article>

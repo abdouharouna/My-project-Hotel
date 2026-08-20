@@ -13,19 +13,34 @@
   h1, h2, h3, h4 {
     @apply font-serif;
   }
+  :focus-visible {
+    @apply outline-none;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-coral-400 px-7 py-3 text-sm font-semibold tracking-wide text-white shadow-soft transition-all duration-300 hover:bg-coral-500 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-coral-300;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-coral-400 px-7 py-3 text-sm font-semibold tracking-wide text-white shadow-soft transition-all duration-300 hover:bg-coral-500 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-7 py-3 text-sm font-semibold tracking-wide text-white transition-all duration-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-7 py-3 text-sm font-semibold tracking-wide text-white transition-all duration-300 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60;
   }
   .field {
-    @apply w-full rounded-xl border border-lagoon-100 bg-white px-4 py-3 text-lagoon-900 placeholder:text-lagoon-300 transition focus:border-lagoon-400 focus:outline-none focus:ring-2 focus:ring-lagoon-200;
+    @apply w-full rounded-xl border border-lagoon-100 bg-white px-4 py-3 text-lagoon-900 placeholder:text-lagoon-300 transition focus:border-lagoon-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lagoon-200;
   }
   .chip {
     @apply inline-flex items-center rounded-full bg-lagoon-50 px-3 py-1 text-xs font-medium text-lagoon-700;
+  }
+}
+
+/* Respecte les préférences de mouvement réduit. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

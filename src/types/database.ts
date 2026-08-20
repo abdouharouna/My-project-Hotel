@@ -18,7 +18,7 @@ export interface TypeChambre {
   nom: string | null
   description: string | null
   capacite: number | null
-  prix_par_nuit: number | null
+  tarif_nuit: number | null
 }
 
 export interface Disponibilite {
